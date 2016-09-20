@@ -13,6 +13,7 @@ static HINSTANCE hInst;
 static Utf8Ini settings;
 static wchar_t szIniFile[MAX_PATH] = L"";
 static CRITICAL_SECTION csIni;
+static CRITICAL_SECTION csTranslate;
 static bool bDisableGUIUpdate;
 
 #define CHECK_GUI_UPDATE_DISABLED \
@@ -45,6 +46,7 @@ BRIDGE_IMPEXP const wchar_t* BridgeInit()
 {
     //Initialize critial section
     InitializeCriticalSection(&csIni);
+    InitializeCriticalSection(&csTranslate);
 
     //Settings load
     if(!GetModuleFileNameW(0, szIniFile, MAX_PATH))
@@ -65,6 +67,7 @@ BRIDGE_IMPEXP const wchar_t* BridgeInit()
     LOADLIBRARY(gui_lib);
     LOADEXPORT(_gui_guiinit);
     LOADEXPORT(_gui_sendmessage);
+    LOADEXPORT(_gui_translate_text);
 
     //DBG Load
     LOADLIBRARY(dbg_lib);
@@ -104,6 +107,7 @@ BRIDGE_IMPEXP const wchar_t* BridgeStart()
         return L"Failed to save settings!";
     _dbg_sendmessage(DBG_DEINITIALIZE_LOCKS, nullptr, nullptr); //deinitialize locks when only one thread is left (hopefully)
     DeleteCriticalSection(&csIni);
+    DeleteCriticalSection(&csTranslate);
     return 0;
 }
 
@@ -1480,6 +1484,19 @@ BRIDGE_IMPEXP void GuiSetFavouriteToolShortcut(const char* name, const char* sho
 BRIDGE_IMPEXP void GuiFoldDisassembly(duint startAddress, duint length)
 {
     _gui_sendmessage(GUI_FOLD_DISASSEMBLY, (void*)startAddress, (void*)length);
+}
+
+BRIDGE_IMPEXP void GuiSelectInMemoryMap(duint addr)
+{
+    _gui_sendmessage(GUI_SELECT_IN_MEMORY_MAP, (void*)addr, nullptr);
+}
+
+BRIDGE_IMPEXP const char* GuiTranslateText(const char* Source)
+{
+    EnterCriticalSection(&csTranslate);
+    const char* text = _gui_translate_text(Source);
+    LeaveCriticalSection(&csTranslate);
+    return text;
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)

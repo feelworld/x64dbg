@@ -16,11 +16,13 @@ HINSTANCE hInst;
 \brief Number of allocated buffers by emalloc(). This should be 0 when x64dbg ends.
 */
 static int emalloc_count = 0;
-
+#ifdef ENABLE_MEM_TRACE
 /**
 \brief Path for debugging, used to create an allocation trace file on emalloc() or efree(). Not used.
 */
 static char alloctrace[MAX_PATH] = "";
+static std::map<void*, int> alloctracemap;
+#endif
 
 /**
 \brief Allocates a new buffer.
@@ -31,21 +33,29 @@ static char alloctrace[MAX_PATH] = "";
 void* emalloc(size_t size, const char* reason)
 {
     ASSERT_NONZERO(size);
-
+#ifdef ENABLE_MEM_TRACE
+    unsigned char* a = (unsigned char*)GlobalAlloc(GMEM_FIXED, size + sizeof(void*));
+#else
     unsigned char* a = (unsigned char*)GlobalAlloc(GMEM_FIXED, size);
+#endif //ENABLE_MEM_TRACE
     if(!a)
     {
         MessageBoxW(0, L"Could not allocate memory", L"Error", MB_ICONERROR);
         ExitProcess(1);
     }
-    memset(a, 0, size);
     emalloc_count++;
-    /*
+#ifdef ENABLE_MEM_TRACE
+    memset(a, 0, size + sizeof(void*));
     FILE* file = fopen(alloctrace, "a+");
-    fprintf(file, "DBG%.5d:  alloc:" fhex ":%s:" fhex "\n", emalloc_count, a, reason, size);
+    fprintf(file, "DBG%.5d:  alloc:%p:%p:%s:%p\n", emalloc_count, a, _ReturnAddress(), reason, size);
     fclose(file);
-    */
+    alloctracemap[_ReturnAddress()]++;
+    *(void**)a = _ReturnAddress();
+    return a + sizeof(void*);
+#else
+    memset(a, 0, size);
     return a;
+#endif //ENABLE_MEM_TRACE
 }
 
 /**
@@ -74,21 +84,46 @@ void* erealloc(void* ptr, size_t size, const char* reason)
 void efree(void* ptr, const char* reason)
 {
     emalloc_count--;
-    /*
+#ifdef ENABLE_MEM_TRACE
+    char* ptr2 = (char*)ptr - sizeof(void*);
     FILE* file = fopen(alloctrace, "a+");
-    fprintf(file, "DBG%.5d:   free:" fhex ":%s\n", emalloc_count, ptr, reason);
+    fprintf(file, "DBG%.5d:   free:%p:%p:%s\n", emalloc_count, ptr, *(void**)ptr2, reason);
     fclose(file);
-    */
+    if(alloctracemap.find(*(void**)ptr2) != alloctracemap.end())
+    {
+        if(--alloctracemap.at(*(void**)ptr2) < 0)
+        {
+            String str = StringUtils::sprintf("address %p, reason %s", *(void**)ptr2, reason);
+            MessageBoxA(0, str.c_str, "Free memory more than once", MB_OK);
+        }
+    }
+    else
+    {
+        String str = StringUtils::sprintf("address %p, reason %s", *(void**)ptr2, reason);
+        MessageBoxA(0, str.c_str(), "Trying to free a const memory", MB_OK);
+    }
+    GlobalFree(ptr2);
+#else
     GlobalFree(ptr);
+#endif //ENABLE_MEM_TRACE
 }
 
 void* json_malloc(size_t size)
 {
+#ifdef ENABLE_MEM_TRACE
     return emalloc(size, "json:ptr");
+#else
+    return emalloc(size);
+#endif
 }
 
 void json_free(void* ptr)
 {
+#ifdef ENABLE_MEM_TRACE
+    return efree(ptr, "json:ptr");
+#else
+    return efree(ptr);
+#endif
     efree(ptr, "json:ptr");
 }
 
@@ -98,9 +133,20 @@ void json_free(void* ptr)
 */
 int memleaks()
 {
+#ifdef ENABLE_MEM_TRACE
+    for(auto & i : alloctracemap)
+    {
+        if(i.second != 0)
+        {
+            String str = StringUtils::sprintf("memory leak at %p : count %d", i.first, i.second);
+            MessageBoxA(0, str.c_str(), "memory leaks", MB_OK);
+        }
+    }
+#endif
     return emalloc_count;
 }
 
+#ifdef ENABLE_MEM_TRACE
 /**
 \brief Sets the path for the allocation trace file.
 \param file UTF-8 filepath.
@@ -109,39 +155,7 @@ void setalloctrace(const char* file)
 {
     strcpy_s(alloctrace, file);
 }
-
-/**
-\brief A function to determine if a string is contained in a specifically formatted 'array string'.
-\param cmd_list Array of strings separated by '\1'.
-\param cmd The string to look for.
-\return true if \p cmd is contained in \p cmd_list.
-*/
-bool arraycontains(const char* cmd_list, const char* cmd)
-{
-    //TODO: fix this function a little
-    if(!cmd_list || !cmd)
-        return false;
-    char temp[deflen] = "";
-    strcpy_s(temp, cmd_list);
-    int len = (int)strlen(cmd_list);
-    if(len >= deflen)
-        return false;
-    for(int i = 0; i < len; i++)
-        if(temp[i] == 1)
-            temp[i] = 0;
-    if(!_stricmp(temp, cmd))
-        return true;
-    for(int i = (int)strlen(temp); i < len; i++)
-    {
-        if(!temp[i])
-        {
-            if(!_stricmp(temp + i + 1, cmd))
-                return true;
-            i += (int)strlen(temp + i + 1);
-        }
-    }
-    return false;
-}
+#endif //ENABLE_MEM_TRACE
 
 /**
 \brief Compares two strings without case-sensitivity.

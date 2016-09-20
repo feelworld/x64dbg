@@ -37,6 +37,22 @@ typedef enum
 
 } cmdline_error_type_t;
 
+typedef enum
+{
+    NO_QOUTES = 0,
+    QOUTES_AROUND_EXE,
+    QOUTES_AT_BEGIN_AND_END,
+    NO_CLOSE_QUOTE_FOUND
+
+} cmdline_qoutes_placement_t_enum;
+
+typedef struct
+{
+    cmdline_qoutes_placement_t_enum posEnum;
+    size_t firstPos;
+    size_t secondPos;
+} cmdline_qoutes_placement_t;
+
 typedef struct
 {
     cmdline_error_type_t type;
@@ -83,14 +99,18 @@ void dbgaddignoredexception(ExceptionRange range);
 bool dbgisignoredexception(unsigned int exception);
 bool dbgcmdnew(const char* name, CBCOMMAND cbCommand, bool debugonly);
 bool dbgcmddel(const char* name);
-bool dbglistprocesses(std::vector<PROCESSENTRY32>* list);
+bool dbglistprocesses(std::vector<PROCESSENTRY32>* infoList, std::vector<std::string>* commandList);
 bool dbgsetcmdline(const char* cmd_line, cmdline_error_t* cmd_line_error);
-bool dbggetcmdline(char** cmd_line, cmdline_error_t* cmd_line_error);
+bool dbggetcmdline(char** cmd_line, cmdline_error_t* cmd_line_error, HANDLE hProcess = NULL);
+cmdline_qoutes_placement_t getqoutesplacement(const char* cmdline);
 void dbgstartscriptthread(CBPLUGINSCRIPT cbScript);
 duint dbggetdebuggedbase();
 duint dbggetdbgevents();
 bool dbgsettracecondition(String expression, duint maxCount);
 bool dbgtraceactive();
+void dbgsetdebuggeeinitscript(const char* fileName);
+const char* dbggetdebuggeeinitscript();
+void dbgsetforeground();
 
 void cbStep();
 void cbRtrStep();
@@ -102,16 +122,6 @@ void cbUserBreakpoint();
 void cbDebugLoadLibBPX();
 void cbLibrarianBreakpoint(void* lpData);
 DWORD WINAPI threadDebugLoop(void* lpParameter);
-bool cbDeleteAllBreakpoints(const BREAKPOINT* bp);
-bool cbEnableAllBreakpoints(const BREAKPOINT* bp);
-bool cbDisableAllBreakpoints(const BREAKPOINT* bp);
-bool cbEnableAllHardwareBreakpoints(const BREAKPOINT* bp);
-bool cbDisableAllHardwareBreakpoints(const BREAKPOINT* bp);
-bool cbEnableAllMemoryBreakpoints(const BREAKPOINT* bp);
-bool cbDisableAllMemoryBreakpoints(const BREAKPOINT* bp);
-bool cbBreakpointList(const BREAKPOINT* bp);
-bool cbDeleteAllMemoryBreakpoints(const BREAKPOINT* bp);
-bool cbDeleteAllHardwareBreakpoints(const BREAKPOINT* bp);
 void cbTOCNDStep();
 void cbTICNDStep();
 void cbTIBTStep();
@@ -128,11 +138,14 @@ EXCEPTION_DEBUG_INFO getLastExceptionInfo();
 extern PROCESS_INFORMATION* fdProcessInfo;
 extern HANDLE hActiveThread;
 extern HANDLE hProcessToken;
+extern char szProgramDir[MAX_PATH];
 extern char szFileName[MAX_PATH];
 extern char szSymbolCachePath[MAX_PATH];
 extern bool bUndecorateSymbolNames;
 extern bool bEnableSourceDebugging;
 extern bool bTraceRecordEnabledDuringTrace;
 extern bool bSkipInt3Stepping;
+extern bool bIgnoreInconsistentBreakpoints;
+extern bool bNoForegroundWindow;
 
 #endif // _DEBUGGER_H

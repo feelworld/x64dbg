@@ -1,4 +1,7 @@
 #include "DisassemblerGraphView.h"
+#include "MenuBuilder.h"
+#include "CachedFontMetrics.h"
+#include "QBeaEngine.h"
 #include <vector>
 #include <QPainter>
 #include <QScrollBar>
@@ -58,6 +61,11 @@ DisassemblerGraphView::DisassemblerGraphView(QWidget* parent)
     connect(Config(), SIGNAL(shortcutsUpdated()), this, SLOT(shortcutsUpdatedSlot()));
 
     colorsUpdatedSlot();
+}
+
+DisassemblerGraphView::~DisassemblerGraphView()
+{
+    delete this->highlight_token;
 }
 
 void DisassemblerGraphView::initFont()
@@ -140,6 +148,7 @@ void DisassemblerGraphView::copy_address()
 void DisassemblerGraphView::paintNormal(QPainter & p, QRect & viewportRect, int xofs, int yofs)
 {
     //Translate the painter
+    auto dbgfunctions = DbgFunctions();
     QPoint translation(this->renderXOfs - xofs, this->renderYOfs - yofs);
     p.translate(translation);
     viewportRect.translate(-translation.x(), -translation.y());
@@ -174,12 +183,22 @@ void DisassemblerGraphView::paintNormal(QPainter & p, QRect & viewportRect, int 
                 int y = block.y + (2 * this->charWidth) + (int(block.block.header_text.lines.size()) * this->charHeight);
                 for(Instr & instr : block.block.instrs)
                 {
-                    if(instr.addr == this->cur_instr)
+                    auto selected = instr.addr == this->cur_instr;
+                    auto traced = dbgfunctions->GetTraceRecordHitCount(instr.addr) != 0;
+                    if(selected && traced)
                     {
-                        p.setPen(QColor(0, 0, 0, 0));
-                        p.setBrush(disassemblySelectionColor);
-                        p.drawRect(block.x + this->charWidth + 3, y, block.width - (10 + 2 * this->charWidth),
-                                   int(instr.text.lines.size()) * this->charHeight);
+                        p.fillRect(QRect(block.x + this->charWidth + 3, y, block.width - (10 + 2 * this->charWidth),
+                                         int(instr.text.lines.size()) * this->charHeight), disassemblyTracedSelectionColor);
+                    }
+                    else if(selected)
+                    {
+                        p.fillRect(QRect(block.x + this->charWidth + 3, y, block.width - (10 + 2 * this->charWidth),
+                                         int(instr.text.lines.size()) * this->charHeight), disassemblySelectionColor);
+                    }
+                    else if(traced)
+                    {
+                        p.fillRect(QRect(block.x + this->charWidth + 3, y, block.width - (10 + 2 * this->charWidth),
+                                         int(instr.text.lines.size()) * this->charHeight), disassemblyTracedColor);
                     }
                     y += int(instr.text.lines.size()) * this->charHeight;
                 }
@@ -216,6 +235,7 @@ void DisassemblerGraphView::paintNormal(QPainter & p, QRect & viewportRect, int 
 
 void DisassemblerGraphView::paintOverview(QPainter & p, QRect & viewportRect, int xofs, int yofs)
 {
+    auto dbgfunctions = DbgFunctions();
     // Scale and translate painter
     qreal sx = qreal(viewportRect.width()) / qreal(this->renderWidth);
     qreal sy = qreal(viewportRect.height()) / qreal(this->renderHeight);
@@ -271,7 +291,10 @@ void DisassemblerGraphView::paintOverview(QPainter & p, QRect & viewportRect, in
         //Render node background
         pen.setColor(Qt::black);
         p.setPen(pen);
-        p.setBrush(QBrush(disassemblyBackgroundColor));
+        if(dbgfunctions->GetTraceRecordHitCount(block.block.entry) != 0)
+            p.setBrush(QBrush(disassemblyTracedColor));
+        else
+            p.setBrush(QBrush(disassemblyBackgroundColor));
         p.drawRect(block.x + this->charWidth, block.y + this->charWidth,
                    block.width - (4 + 2 * this->charWidth), block.height - (4 + 2 * this->charWidth));
     }
@@ -298,12 +321,16 @@ void DisassemblerGraphView::paintEvent(QPaintEvent* event)
 
     //Render background
     QRect viewportRect = this->viewport()->rect();
-    p.setBrush(QBrush(disassemblySelectionColor));
+    p.setBrush(QBrush(backgroundColor));
     p.drawRect(viewportRect);
     p.setBrush(Qt::black);
 
     if(!this->ready || !DbgIsDebugging())
+    {
+        p.setPen(Qt::black);
+        p.drawText(viewportRect, Qt::AlignCenter | Qt::AlignVCenter, tr("Use Graph command or menu action to draw control flow graph here..."));
         return;
+    }
 
     if(drawOverview)
         paintOverview(p, viewportRect, xofs, yofs);
@@ -477,6 +504,7 @@ void DisassemblerGraphView::mousePressEvent(QMouseEvent* event)
     {
         //Check for click on a token and highlight it
         Token token;
+        delete this->highlight_token;
         if(this->getTokenForMouseEvent(event, token))
             this->highlight_token = HighlightToken::fromToken(token);
         else
@@ -510,9 +538,12 @@ void DisassemblerGraphView::mousePressEvent(QMouseEvent* event)
     else if(event->button() == Qt::RightButton)
     {
         //Right click outside of block
-        QMenu wMenu(this);
-        wMenu.addAction(mToggleOverviewAction);
-        wMenu.exec(event->globalPos()); //execute context menu
+        if(this->ready && DbgIsDebugging())
+        {
+            QMenu wMenu(this);
+            wMenu.addAction(mToggleOverviewAction);
+            wMenu.exec(event->globalPos()); //execute context menu
+        }
     }
 }
 
@@ -1315,18 +1346,23 @@ void DisassemblerGraphView::setupContextMenu()
 void DisassemblerGraphView::followDisassemblerSlot()
 {
     DbgCmdExec(QString("disasm %1").arg(ToPtrString(this->cur_instr)).toUtf8().constData());
-    emit showCpu();
 }
 
 void DisassemblerGraphView::colorsUpdatedSlot()
 {
     disassemblyBackgroundColor = ConfigColor("DisassemblyBackgroundColor");
     disassemblySelectionColor = ConfigColor("DisassemblySelectionColor");
+    disassemblyTracedColor = ConfigColor("DisassemblyTracedBackgroundColor");
+    auto a = disassemblySelectionColor, b = disassemblyTracedColor;
+    disassemblyTracedSelectionColor = QColor((a.red() + b.red()) / 2, (a.green() + b.green()) / 2, (a.blue() + b.blue()) / 2);
 
     jmpColor = ConfigColor("GraphJmpColor");
     brtrueColor = ConfigColor("GraphBrtrueColor");
     brfalseColor = ConfigColor("GraphBrfalseColor");
     retShadowColor = ConfigColor("GraphRetShadowColor");
+    backgroundColor = ConfigColor("GraphBackgroundColor");
+    if(!backgroundColor.alpha())
+        backgroundColor = disassemblySelectionColor;
 
     fontChanged();
 }

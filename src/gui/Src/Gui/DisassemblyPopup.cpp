@@ -1,5 +1,6 @@
 #include "DisassemblyPopup.h"
 #include "Disassembly.h"
+#include "CachedFontMetrics.h"
 #include "Configuration.h"
 #include "StringUtil.h"
 #include <QPainter>
@@ -16,6 +17,7 @@ DisassemblyPopup::DisassemblyPopup(Disassembly* parent) :
     updateFont();
     updateColors();
     setFrameStyle(QFrame::Panel);
+    setLineWidth(2);
     mMaxInstructions = 20;
 }
 
@@ -27,12 +29,16 @@ DisassemblyPopup::~DisassemblyPopup()
 void DisassemblyPopup::updateColors()
 {
     disassemblyBackgroundColor = ConfigColor("DisassemblyBackgroundColor");
+    disassemblyTracedColor = ConfigColor("DisassemblyTracedBackgroundColor");
     labelColor = ConfigColor("DisassemblyLabelColor");
     labelBackgroundColor = ConfigColor("DisassemblyLabelBackgroundColor");
     commentColor = ConfigColor("DisassemblyCommentColor");
     commentBackgroundColor = ConfigColor("DisassemblyCommentBackgroundColor");
     commentAutoColor = ConfigColor("DisassemblyAutoCommentColor");
     commentAutoBackgroundColor = ConfigColor("DisassemblyAutoCommentBackgroundColor");
+    QPalette palette;
+    palette.setColor(QPalette::Foreground, ConfigColor("AbstractTableViewSeparatorColor"));
+    setPalette(palette);
 }
 
 void DisassemblyPopup::updateFont()
@@ -57,22 +63,24 @@ void DisassemblyPopup::paintEvent(QPaintEvent* event)
     // Draw Address
     p.setPen(QPen(labelColor));
     int addrWidth = mFontMetrics->width(addrText);
-    p.fillRect(2, 1, addrWidth, charHeight, QBrush(labelBackgroundColor));
-    p.drawText(2, 1, addrWidth, charHeight, 0, addrText);
+    p.fillRect(3, 2 + lineWidth(), addrWidth, charHeight, QBrush(labelBackgroundColor));
+    p.drawText(3, 2, addrWidth, charHeight, 0, addrText);
     // Draw Comments
     if(!addrComment.isEmpty())
     {
         int commentWidth = mFontMetrics->width(addrComment);
         QBrush background = QBrush(addrCommentAuto ? commentAutoBackgroundColor : commentBackgroundColor);
         p.setPen(addrCommentAuto ? commentAutoColor : commentColor);
-        p.fillRect(2 + addrWidth, 1, commentWidth, charHeight, background);
-        p.drawText(2 + addrWidth, 1, commentWidth, charHeight, 0, addrComment);
+        p.fillRect(3 + addrWidth, 2, commentWidth, charHeight, background);
+        p.drawText(3 + addrWidth, 2, commentWidth, charHeight, 0, addrComment);
     }
     // Draw Instructions
     int y = charHeight + 1;
     for(auto & instruction : mDisassemblyToken)
     {
-        RichTextPainter::paintRichText(&p, 2, y, mWidth - 2, charHeight, 0, instruction, mFontMetrics);
+        if(instruction.second)
+            p.fillRect(QRect(3, y, mWidth - 3, charHeight), disassemblyTracedColor);
+        RichTextPainter::paintRichText(&p, 3, y, mWidth - 3, charHeight, 0, instruction.first, mFontMetrics);
         y += charHeight;
     }
     QFrame::paintEvent(event);
@@ -81,7 +89,7 @@ void DisassemblyPopup::paintEvent(QPaintEvent* event)
 void DisassemblyPopup::setAddress(duint Address)
 {
     addr = Address;
-    mInstBuffer.clear();
+    QList<Instruction_t> mInstBuffer;
     mDisassemblyToken.clear();
     if(addr != 0)
     {
@@ -94,11 +102,16 @@ void DisassemblyPopup::setAddress(duint Address)
         mInstBuffer.clear();
         QList<dsint> rvaList;
         dsint nextRva = rva;
+        bool hadBranch = false;
         do
         {
-            dsint nextRva2;
             rvaList.append(nextRva);
-            nextRva2 = parent->getNextInstructionRVA(nextRva, 1, true);
+            Instruction_t instruction = parent->DisassembleAt(nextRva);
+            if(!hadBranch && instruction.tokens.tokens[0].text.toLower() == "ret")
+                break;
+            if(instruction.branchDestination)
+                hadBranch = true;
+            auto nextRva2 = nextRva + instruction.length;
             if(nextRva2 == nextRva)
                 break;
             else
@@ -119,12 +132,14 @@ void DisassemblyPopup::setAddress(duint Address)
             for(auto & token : richText)
                 currentInstructionWidth += mFontMetrics->width(token.text);
             mWidth = std::max(mWidth, currentInstructionWidth);
-            mDisassemblyToken.push_back(std::move(richText));
+            mDisassemblyToken.push_back(std::make_pair(std::move(richText), DbgFunctions()->GetTraceRecordHitCount(instruction.rva + base) != 0));
         }
         // Address
         addrText = parent->getAddrText(addr, nullptr);
         // Comments
         GetCommentFormat(addr, addrComment, &addrCommentAuto);
+        if(addrComment.length())
+            addrText.append(' ');
         // Calculate width of address
         mWidth = std::max(mWidth, mFontMetrics->width(addrText) + mFontMetrics->width(addrComment));
         mWidth += charWidth * 6;

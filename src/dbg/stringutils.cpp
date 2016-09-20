@@ -1,5 +1,4 @@
 #include "stringutils.h"
-#include "memory.h"
 #include "value.h"
 #include "dynamicmem.h"
 #include <windows.h>
@@ -365,7 +364,11 @@ String StringUtils::ToCompressedHex(unsigned char* buffer, size_t size)
             result.push_back(HEXLOOKUP[lastCh & 0xF]);
         }
         else if(repeat > 2)
-            result.append(StringUtils::sprintf("{%" fext "X}", repeat));
+#ifdef _WIN64
+            result.append(StringUtils::sprintf("{%llX}", repeat));
+#else //x86
+            result.append(StringUtils::sprintf("{%X}", repeat));
+#endif //_WIN64
     }
     return result;
 }

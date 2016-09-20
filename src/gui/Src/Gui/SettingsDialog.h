@@ -51,6 +51,8 @@ private slots:
     void on_chkSaveDatabaseInProgramDirectory_stateChanged(int arg1);
     void on_chkTraceRecordEnabledDuringTrace_stateChanged(int arg1);
     void on_chkSkipInt3Stepping_toggled(bool checked);
+    void on_chkNoScriptTimeout_stateChanged(int arg1);
+    void on_chkIgnoreInconsistentBreakpoints_toggled(bool checked);
     //Exception tab
     void on_btnAddRange_clicked();
     void on_btnDeleteRange_clicked();
@@ -66,6 +68,9 @@ private slots:
     void on_chkSaveColumnOrder_stateChanged(int arg1);
     void on_chkSaveLoadTabOrder_stateChanged(int arg1);
     void on_chkNoCloseDialog_toggled(bool checked);
+    void on_chkPidInHex_clicked(bool checked);
+    void on_chkSidebarWatchLabels_stateChanged(int arg1);
+    void on_chkNoForegroundWindow_toggled(bool checked);
     //Misc tab
     void on_chkSetJIT_stateChanged(int arg1);
     void on_chkConfirmBeforeAtt_stateChanged(int arg1);
@@ -126,6 +131,8 @@ private:
         bool engineDisableDatabaseCompression;
         bool engineEnableTraceRecordDuringTrace;
         bool engineSkipInt3Stepping;
+        bool engineNoScriptTimeout;
+        bool engineIgnoreInconsistentBreakpoints;
         //Exception Tab
         QList<RangeStruct>* exceptionRanges;
         //Disasm Tab
@@ -138,6 +145,9 @@ private:
         bool guiFpuRegistersLittleEndian;
         bool guiSaveColumnOrder;
         bool guiNoCloseDialog;
+        bool guiPidInHex;
+        bool guiSidebarWatchLabels;
+        bool guiNoForegroundWindow;
         //Misc Tab
         bool miscSetJIT;
         bool miscSetJITAuto;

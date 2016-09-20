@@ -167,7 +167,10 @@ SOURCES += \
     Src/Gui/FavouriteTools.cpp \
     Src/Gui/BrowseDialog.cpp \
     Src/Gui/DisassemblerGraphView.cpp \
-    Src/Gui/DisassemblyPopup.cpp
+    Src/Gui/DisassemblyPopup.cpp \
+    Src/Gui/VirtualModDialog.cpp \
+    Src/BasicView/LabeledSplitter.cpp \
+    Src/BasicView/LabeledSplitterDetachedWindow.cpp
 
 
 HEADERS += \
@@ -271,7 +274,10 @@ HEADERS += \
     Src/Gui/BrowseDialog.h \
     Src/Gui/DisassemblerGraphView.h \
     Src/Utils/ActionHelpers.h \
-    Src/Gui/DisassemblyPopup.h
+    Src/Gui/DisassemblyPopup.h \
+    Src/Gui/VirtualModDialog.h \
+    Src/BasicView/LabeledSplitter.h \
+    Src/BasicView/LabeledSplitterDetachedWindow.h
     
 
 FORMS += \
@@ -306,15 +312,13 @@ FORMS += \
     Src/Gui/CodepageSelectionDialog.ui \
     Src/Gui/ColumnReorderDialog.ui \
     Src/Gui/FavouriteTools.ui \
-    Src/Gui/BrowseDialog.ui
-
-TRANSLATIONS = \
-    Translations/x64dbg.ts
+    Src/Gui/BrowseDialog.ui \
+    Src/Gui/VirtualModDialog.ui
 
 ##
 ## Libraries
 ##
-LIBS += -luser32
+LIBS += -luser32 -ladvapi32
 
 !contains(QMAKE_HOST.arch, x86_64) {
     # Windows x86 (32bit) specific build

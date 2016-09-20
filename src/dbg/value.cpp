@@ -1312,7 +1312,7 @@ bool valapifromstring(const char* name, duint* value, int* value_size, bool prin
         if(!GetModuleFileNameExW(fdProcessInfo->hProcess, (HMODULE)modbase, szModName, MAX_PATH))
         {
             if(!silent)
-                dprintf("could not get filename of module " fhex "\n", modbase);
+                dprintf(QT_TRANSLATE_NOOP("DBG", "could not get filename of module %p\n"), modbase);
         }
         else
         {
@@ -1320,7 +1320,7 @@ bool valapifromstring(const char* name, duint* value, int* value_size, bool prin
             if(!mod)
             {
                 if(!silent)
-                    dprintf("unable to load library %s\n", szModName);
+                    dprintf(QT_TRANSLATE_NOOP("DBG", "unable to load library %s\n"), szModName);
             }
             else
             {
@@ -1332,7 +1332,7 @@ bool valapifromstring(const char* name, duint* value, int* value_size, bool prin
                     if(scmp(apiname, "base") || scmp(apiname, "imagebase") || scmp(apiname, "header")) //get loaded base
                         addr = modbase;
                     else if(scmp(apiname, "entrypoint") || scmp(apiname, "entry") || scmp(apiname, "oep") || scmp(apiname, "ep")) //get entry point
-                        addr = modbase + GetPE32DataW(szModName, 0, UE_OEP);
+                        addr = ModEntryFromAddr(modbase);
                     else if(*apiname == '$') //RVA
                     {
                         duint rva;
@@ -1435,7 +1435,7 @@ bool valapifromstring(const char* name, duint* value, int* value_size, bool prin
             return true;
         for(int i = 0; i < found; i++)
             if(i != kernel32)
-                dprintf(fhex"\n", addrfound()[i]);
+                dprintf_untranslated("%p\n", addrfound()[i]);
     }
     else
     {
@@ -1443,7 +1443,7 @@ bool valapifromstring(const char* name, duint* value, int* value_size, bool prin
         if(!printall || silent)
             return true;
         for(int i = 1; i < found; i++)
-            dprintf(fhex"\n", addrfound()[i]);
+            dprintf_untranslated("%p\n", addrfound()[i]);
     }
     return true;
 }
@@ -1534,7 +1534,7 @@ static bool isdigitduint(char digit)
 \param string The string to parse.
 \param [out] value The value of the expression. This value cannot be null.
 \param silent true to not output anything to the console.
-\param baseonly true to skip parsing API names, labels, symbols and variables (basic expressions only).
+\param baseonly true to skip parsing API names, labels and symbols (basic expressions only).
 \param [out] value_size This function can output the value size parsed (for example memory location size or register size). Can be null.
 \param [out] isvar This function can output if the expression is variable (for example memory locations, registers or variables are variable). Can be null.
 \param [out] hexonly This function can output if the output value should only be printed as hexadecimal (for example addresses). Can be null.
@@ -1556,7 +1556,7 @@ bool valfromstring_noexpr(const char* string, duint* value, bool silent, bool ba
         if(!DbgIsDebugging())
         {
             if(!silent)
-                dputs("not debugging");
+                dputs(QT_TRANSLATE_NOOP("DBG", "not debugging"));
             *value = 0;
             if(value_size)
                 *value_size = 0;
@@ -1615,7 +1615,7 @@ bool valfromstring_noexpr(const char* string, duint* value, bool silent, bool ba
         if(!valfromstring(ptrstring.c_str(), value, silent, baseonly))
         {
             if(!silent)
-                dprintf("noexpr failed on %s\n", ptrstring.c_str());
+                dprintf(QT_TRANSLATE_NOOP("DBG", "noexpr failed on %s\n"), ptrstring.c_str());
             return false;
         }
         duint addr = *value;
@@ -1623,11 +1623,17 @@ bool valfromstring_noexpr(const char* string, duint* value, bool silent, bool ba
         if(!MemRead(addr + seg_offset, value, read_size))
         {
             if(!silent)
-                dputs("failed to read memory");
+                dputs(QT_TRANSLATE_NOOP("DBG", "failed to read memory"));
             return false;
         }
         if(value_size)
             *value_size = read_size;
+        if(isvar)
+            *isvar = true;
+        return true;
+    }
+    else if(varget(string, value, value_size, 0))    //then come variables
+    {
         if(isvar)
             *isvar = true;
         return true;
@@ -1637,7 +1643,7 @@ bool valfromstring_noexpr(const char* string, duint* value, bool silent, bool ba
         if(!DbgIsDebugging())
         {
             if(!silent)
-                dputs("not debugging!");
+                dputs(QT_TRANSLATE_NOOP("DBG", "not debugging!"));
             *value = 0;
             if(value_size)
                 *value_size = 0;
@@ -1655,7 +1661,7 @@ bool valfromstring_noexpr(const char* string, duint* value, bool silent, bool ba
         if(!DbgIsDebugging())
         {
             if(!silent)
-                dputs("not debugging");
+                dputs(QT_TRANSLATE_NOOP("DBG", "not debugging"));
             *value = 0;
             if(value_size)
                 *value_size = 0;
@@ -1696,26 +1702,26 @@ bool valfromstring_noexpr(const char* string, duint* value, bool silent, bool ba
     }
     if(baseonly)
         return false;
+    if(isvar)
+        *isvar = false;
     else if(valapifromstring(string, value, value_size, true, silent, hexonly))  //then come APIs
         return true;
     else if(LabelFromString(string, value))  //then come labels
         return true;
     else if(SymAddrFromName(string, value))  //then come symbols
         return true;
-    else if(varget(string, value, value_size, 0))  //then come variables
-    {
-        if(isvar)
-            *isvar = true;
-        return true;
-    }
     else if(strstr(string, "sub_") == string)  //then come sub_ functions
     {
-        auto result = sscanf(string, "sub_%" fext "X", value) == 1;
+#ifdef _WIN64
+        bool result = sscanf(string, "sub_%llX", value) == 1;
+#else //x86
+        bool result = sscanf(string, "sub_%X", value) == 1;
+#endif //_WIN64
         duint start;
         return result && FunctionGet(*value, &start, nullptr) && *value == start;
     }
     if(!silent)
-        dprintf("invalid value: \"%s\"!\n", string);
+        dprintf(QT_TRANSLATE_NOOP("DBG", "invalid value: \"%s\"!\n"), string);
     return false; //nothing was OK
 }
 
@@ -2187,7 +2193,7 @@ bool valtostring(const char* string, duint value, bool silent)
         if(!DbgIsDebugging())
         {
             if(!silent)
-                dputs("not debugging");
+                dputs(QT_TRANSLATE_NOOP("DBG", "not debugging"));
             return false;
         }
         int len = (int)strlen(string);
@@ -2229,7 +2235,7 @@ bool valtostring(const char* string, duint value, bool silent)
         if(!MemPatch(temp, &value_, read_size))
         {
             if(!silent)
-                dputs("failed to write memory");
+                dputs(QT_TRANSLATE_NOOP("DBG", "failed to write memory"));
             return false;
         }
         GuiUpdateAllViews(); //repaint gui
@@ -2241,7 +2247,7 @@ bool valtostring(const char* string, duint value, bool silent)
         if(!DbgIsDebugging())
         {
             if(!silent)
-                dputs("not debugging!");
+                dputs(QT_TRANSLATE_NOOP("DBG", "not debugging!"));
             return false;
         }
         bool ok = setregister(string, value);
@@ -2266,7 +2272,7 @@ bool valtostring(const char* string, duint value, bool silent)
         if(!DbgIsDebugging())
         {
             if(!silent)
-                dputs("not debugging");
+                dputs(QT_TRANSLATE_NOOP("DBG", "not debugging"));
             return false;
         }
         bool set = false;
@@ -2281,7 +2287,7 @@ bool valtostring(const char* string, duint value, bool silent)
         if(!DbgIsDebugging())
         {
             if(!silent)
-                dputs("not debugging!");
+                dputs(QT_TRANSLATE_NOOP("DBG", "not debugging!"));
             return false;
         }
         setfpuvalue(string + 1, value);

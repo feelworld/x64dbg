@@ -2,7 +2,6 @@
 #define SYMBOLVIEW_H
 
 #include <QWidget>
-//#include <QVBoxLayout>
 #include "Bridge.h"
 
 class QMenu;
@@ -31,6 +30,7 @@ private slots:
     void updateSymbolList(int module_count, SYMBOLMODULEINFO* modules);
     void symbolFollow();
     void symbolFollowDump();
+    void enterPressedSlot();
     void symbolContextMenu(QMenu* wMenu);
     void symbolRefreshCurrent();
     void moduleContextMenu(QMenu* wMenu);
@@ -39,6 +39,7 @@ private slots:
     void moduleDownloadSymbols();
     void moduleDownloadAllSymbols();
     void moduleCopyPath();
+    void moduleBrowse();
     void moduleYara();
     void moduleYaraFile();
     void moduleSetUser();
@@ -51,7 +52,6 @@ private slots:
     void emptySearchResultSlot();
 
 signals:
-    void showCpu();
     void showReferences();
 
 private:
@@ -77,6 +77,7 @@ private:
     QAction* mModSetUserAction;
     QAction* mModSetSystemAction;
     QAction* mModSetPartyAction;
+    QAction* mBrowseInExplorer;
 
     static void cbSymbolEnum(SYMBOLINFO* symbol, void* user);
 };

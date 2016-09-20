@@ -15,9 +15,10 @@
 #include <algorithm>
 #include <QMutex>
 #include "Bridge.h"
-#include "QBeaEngine.h"
-#include "CachedFontMetrics.h"
-#include "MenuBuilder.h"
+#include "RichTextPainter.h"
+
+class MenuBuilder;
+class CachedFontMetrics;
 
 class DisassemblerGraphView : public QAbstractScrollArea
 {
@@ -207,6 +208,7 @@ public:
     };
 
     DisassemblerGraphView(QWidget* parent = nullptr);
+    ~DisassemblerGraphView();
     void initFont();
     void adjustSize(int width, int height);
     void resizeEvent(QResizeEvent* event);
@@ -257,9 +259,6 @@ public slots:
     void shortcutsUpdatedSlot();
     void toggleOverviewSlot();
 
-signals:
-    void showCpu();
-
 private:
     QString status;
     Analysis analysis;
@@ -296,10 +295,13 @@ private:
 
     QColor disassemblyBackgroundColor;
     QColor disassemblySelectionColor;
+    QColor disassemblyTracedColor;
+    QColor disassemblyTracedSelectionColor;
     QColor jmpColor;
     QColor brtrueColor;
     QColor brfalseColor;
     QColor retShadowColor;
+    QColor backgroundColor;
 protected:
 #include "ActionHelpers.h"
 };

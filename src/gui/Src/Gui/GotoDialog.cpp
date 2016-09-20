@@ -1,4 +1,5 @@
 #include "GotoDialog.h"
+#include "ValidateExpressionThread.h"
 #include "ui_GotoDialog.h"
 
 GotoDialog::GotoDialog(QWidget* parent, bool allowInvalidExpression, bool allowInvalidAddress)
@@ -54,7 +55,8 @@ void GotoDialog::validateExpression(QString expression)
 {
     duint value;
     bool validExpression = DbgFunctions()->ValFromString(expression.toUtf8().constData(), &value);
-    bool validPointer = validExpression && DbgMemIsValidReadPtr(value);
+    unsigned char ch;
+    bool validPointer = validExpression && DbgMemIsValidReadPtr(value) && DbgMemRead(value, &ch, sizeof(ch));
     this->mValidateThread->emitExpressionChanged(validExpression, validPointer, value);
 }
 

@@ -12,7 +12,6 @@ public:
     void setupContextMenu();
 
 signals:
-    void showCpu();
     void showReferences();
 
 public slots:
@@ -20,6 +19,7 @@ public slots:
     void stateChangedSlot(DBGSTATE state);
     void followDumpSlot();
     void followDisassemblerSlot();
+    void doubleClickedSlot();
     void yaraSlot();
     void memoryAccessSingleshootSlot();
     void memoryAccessRestoreSlot();
@@ -40,6 +40,7 @@ public slots:
     void dumpMemory();
     void selectAddress(duint va);
     void findAddressSlot();
+    void addVirtualModSlot();
 
 private:
     QString getProtectionString(DWORD Protect);
@@ -68,6 +69,7 @@ private:
     QAction* mMemoryAllocate;
     QAction* mMemoryFree;
     QAction* mFindAddress;
+    QAction* mAddVirtualMod;
 
     duint mCipBase;
 };

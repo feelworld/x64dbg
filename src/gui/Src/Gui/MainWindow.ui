@@ -44,6 +44,7 @@
     <addaction name="menuRecentFiles"/>
     <addaction name="actionAttach"/>
     <addaction name="actionDetach"/>
+    <addaction name="actionPatches"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
@@ -109,16 +110,19 @@
     <addaction name="actionseStepInto"/>
     <addaction name="actionStepIntoSource"/>
     <addaction name="actionTicnd"/>
+    <addaction name="actionAnimateInto"/>
     <addaction name="actionStepOver"/>
     <addaction name="actioneStepOver"/>
     <addaction name="actionseStepOver"/>
     <addaction name="actionStepOverSource"/>
     <addaction name="actionRtu"/>
     <addaction name="actionTocnd"/>
+    <addaction name="actionAnimateOver"/>
+    <addaction name="separator"/>
     <addaction name="actionRtr"/>
     <addaction name="actioneRtr"/>
     <addaction name="actionSkipNextInstruction"/>
-    <addaction name="separator"/>
+    <addaction name="actionAnimateCommand"/>
     <addaction name="menuTrace_record"/>
     <addaction name="actionInstrUndo"/>
     <addaction name="separator"/>
@@ -132,6 +136,7 @@
     </property>
     <addaction name="actionCalculator"/>
     <addaction name="actionCheckUpdates"/>
+    <addaction name="actionBlog"/>
     <addaction name="actionDonate"/>
     <addaction name="actionReportBug"/>
     <addaction name="separator"/>
@@ -156,6 +161,8 @@
     <addaction name="actionShortcuts"/>
     <addaction name="actionTopmost"/>
     <addaction name="actionReloadStylesheet"/>
+    <addaction name="actionSetInitializationScript"/>
+    <addaction name="actionImportSettings"/>
    </widget>
    <widget class="QMenu" name="menuFavourites">
     <property name="title">
@@ -547,7 +554,7 @@
      <normaloff>:/icons/images/patch.png</normaloff>:/icons/images/patch.png</iconset>
    </property>
    <property name="text">
-    <string>Patches</string>
+    <string>Patch file...</string>
    </property>
    <property name="toolTip">
     <string>Patches</string>
@@ -992,6 +999,40 @@
    </property>
    <property name="text">
     <string>Run (swallow exception)</string>
+   </property>
+  </action>
+  <action name="actionBlog">
+   <property name="icon">
+    <iconset resource="../../resource.qrc">
+     <normaloff>:/icons/images/hex.png</normaloff>:/icons/images/hex.png</iconset>
+   </property>
+   <property name="text">
+    <string>Blog</string>
+   </property>
+  </action>
+  <action name="actionAnimateInto">
+   <property name="text">
+    <string>Animate into</string>
+   </property>
+  </action>
+  <action name="actionAnimateOver">
+   <property name="text">
+    <string>Animate over</string>
+   </property>
+  </action>
+  <action name="actionAnimateCommand">
+   <property name="text">
+    <string>Animate command...</string>
+   </property>
+  </action>
+  <action name="actionSetInitializationScript">
+   <property name="text">
+    <string>Set Initialization Script</string>
+   </property>
+  </action>
+  <action name="actionImportSettings">
+   <property name="text">
+    <string>Import settings...</string>
    </property>
   </action>
  </widget>

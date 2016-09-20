@@ -35,7 +35,9 @@ void ThreadCreate(CREATE_THREAD_DEBUG_INFO* CreateThread)
 
     // The first thread (#0) is always the main program thread
     if(curInfo.ThreadNumber <= 0)
-        strcpy_s(curInfo.threadName, "Main Thread");
+        strcpy_s(curInfo.threadName, GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "Main Thread")));
+    else
+        curInfo.threadName[0] = 0;
 
     // Modify global thread list
     EXCLUSIVE_ACQUIRE(LockThreads);
@@ -139,6 +141,18 @@ void ThreadGetList(std::vector<THREADINFO> & list)
         list.push_back(thread.second);
 }
 
+bool ThreadGetInfo(DWORD ThreadId, THREADINFO & info)
+{
+    SHARED_ACQUIRE(LockThreads);
+
+    auto found = threadList.find(ThreadId);
+    if(found == threadList.end())
+        return false;
+
+    info = found->second;
+    return true;
+}
+
 bool ThreadIsValid(DWORD ThreadId)
 {
     SHARED_ACQUIRE(LockThreads);
@@ -151,13 +165,13 @@ bool ThreadGetTib(duint TEBAddress, NT_TIB* Tib)
     TEBAddress += offsetof(TEB, Tib);
 
     memset(Tib, 0, sizeof(NT_TIB));
-    return MemRead(TEBAddress, Tib, sizeof(NT_TIB));
+    return MemReadUnsafe(TEBAddress, Tib, sizeof(NT_TIB));
 }
 
 bool ThreadGetTeb(duint TEBAddress, TEB* Teb)
 {
     memset(Teb, 0, sizeof(TEB));
-    return MemRead(TEBAddress, Teb, sizeof(TEB));
+    return MemReadUnsafe(TEBAddress, Teb, sizeof(TEB));
 }
 
 int ThreadGetSuspendCount(HANDLE Thread)
@@ -196,7 +210,7 @@ DWORD ThreadGetLastErrorTEB(ULONG_PTR ThreadLocalBase)
     DWORD lastError = 0;
     duint structOffset = ThreadLocalBase + offsetof(TEB, LastErrorValue);
 
-    MemRead(structOffset, &lastError, sizeof(DWORD));
+    MemReadUnsafe(structOffset, &lastError, sizeof(DWORD));
     return lastError;
 }
 
@@ -221,10 +235,27 @@ bool ThreadSetName(DWORD ThreadId, const char* Name)
         if(!Name)
             Name = "";
 
-        strcpy_s(threadList[ThreadId].threadName, Name);
+        strncpy_s(threadList[ThreadId].threadName, Name, _TRUNCATE);
         return true;
     }
 
+    return false;
+}
+
+/**
+@brief ThreadGetName Get the name of the thread.
+@param ThreadId The id of the thread.
+@param Name The returned name of the thread. Must be at least MAX_THREAD_NAME_SIZE size
+@return True if the function succeeds. False otherwise.
+*/
+bool ThreadGetName(DWORD ThreadId, char* Name)
+{
+    SHARED_ACQUIRE(LockThreads);
+    if(threadList.find(ThreadId) != threadList.end())
+    {
+        strcpy_s(Name, MAX_THREAD_NAME_SIZE, threadList[ThreadId].threadName);
+        return true;
+    }
     return false;
 }
 

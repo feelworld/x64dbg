@@ -5,33 +5,31 @@
 
 CapstoneTokenizer::CapstoneTokenizer(int maxModuleLength)
     : _maxModuleLength(maxModuleLength),
-      _success(false)
+      _success(false),
+      isNop(false)
 {
     SetConfig(false, false, false, false);
 }
 
-std::map<CapstoneTokenizer::TokenType, CapstoneTokenizer::TokenColor> CapstoneTokenizer::colorNamesMap;
+CapstoneTokenizer::TokenColor colorNamesMap[CapstoneTokenizer::TokenType::Last];
 QHash<QString, int> CapstoneTokenizer::stringPoolMap;
 int CapstoneTokenizer::poolId = 0;
 
 void CapstoneTokenizer::addColorName(TokenType type, QString color, QString backgroundColor)
 {
-    colorNamesMap.insert({type, TokenColor(color, backgroundColor)});
+    colorNamesMap[int(type)] = TokenColor(color, backgroundColor);
 }
 
 void CapstoneTokenizer::addStringsToPool(const QString & strings)
 {
     QStringList stringList = strings.split(' ', QString::SkipEmptyParts);
-    bool uppercase = ConfigBool("Disassembler", "Uppercase");
     for(const QString & string : stringList)
-        stringPoolMap.insert(uppercase ? string.toUpper() : string.toLower(), poolId);
+        stringPoolMap.insert(string, poolId);
     poolId++;
 }
 
 void CapstoneTokenizer::UpdateColors()
 {
-    //color names map
-    colorNamesMap.clear();
     //filling
     addColorName(TokenType::Comma, "InstructionCommaColor", "InstructionCommaBackgroundColor");
     addColorName(TokenType::Space, "", "");
@@ -75,10 +73,11 @@ void CapstoneTokenizer::UpdateStringPool()
 {
     poolId = 0;
     stringPoolMap.clear();
-    addStringsToPool("rax eax ax al");
-    addStringsToPool("rbx ebx bx bl");
-    addStringsToPool("rcx ecx cx cl");
-    addStringsToPool("rdx edx dx dl");
+    // These registers must be in lower case.
+    addStringsToPool("rax eax ax al ah");
+    addStringsToPool("rbx ebx bx bl bh");
+    addStringsToPool("rcx ecx cx cl ch");
+    addStringsToPool("rdx edx dx dl dh");
     addStringsToPool("rsi esi si sil");
     addStringsToPool("rdi edi di dil");
     addStringsToPool("rbp ebp bp bpl");
@@ -91,6 +90,22 @@ void CapstoneTokenizer::UpdateStringPool()
     addStringsToPool("r13 r13d r13w r13b");
     addStringsToPool("r14 r14d r14w r14b");
     addStringsToPool("r15 r15d r15w r15b");
+    addStringsToPool("xmm0 ymm0");
+    addStringsToPool("xmm1 ymm1");
+    addStringsToPool("xmm2 ymm2");
+    addStringsToPool("xmm3 ymm3");
+    addStringsToPool("xmm4 ymm4");
+    addStringsToPool("xmm5 ymm5");
+    addStringsToPool("xmm6 ymm6");
+    addStringsToPool("xmm7 ymm7");
+    addStringsToPool("xmm8 ymm8");
+    addStringsToPool("xmm9 ymm9");
+    addStringsToPool("xmm10 ymm10");
+    addStringsToPool("xmm11 ymm11");
+    addStringsToPool("xmm12 ymm12");
+    addStringsToPool("xmm13 ymm13");
+    addStringsToPool("xmm14 ymm14");
+    addStringsToPool("xmm15 ymm15");
 }
 
 bool CapstoneTokenizer::Tokenize(duint addr, const unsigned char* data, int datasize, InstructionToken & instruction)
@@ -100,6 +115,7 @@ bool CapstoneTokenizer::Tokenize(duint addr, const unsigned char* data, int data
     _success = _cp.DisassembleSafe(addr, data, datasize);
     if(_success)
     {
+        isNop = _cp.IsNop();
         if(!tokenizeMnemonic())
             return false;
 
@@ -116,7 +132,10 @@ bool CapstoneTokenizer::Tokenize(duint addr, const unsigned char* data, int data
         }
     }
     else
+    {
+        isNop = false;
         addToken(TokenType::Uncategorized, "???");
+    }
 
     instruction = _inst;
 
@@ -126,6 +145,7 @@ bool CapstoneTokenizer::Tokenize(duint addr, const unsigned char* data, int data
 bool CapstoneTokenizer::TokenizeData(const QString & datatype, const QString & data, InstructionToken & instruction)
 {
     _inst = InstructionToken();
+    isNop = false;
 
     if(!tokenizeMnemonic(TokenType::MnemonicNormal, datatype))
         return false;
@@ -174,10 +194,9 @@ void CapstoneTokenizer::TokenToRichText(const InstructionToken & instr, RichText
         richText.highlightColor = highlightColor;
         richText.flags = RichTextPainter::FlagNone;
         richText.text = token.text;
-        auto found = colorNamesMap.find(token.type);
-        if(found != colorNamesMap.end())
+        if(token.type < TokenType::Last)
         {
-            auto tokenColor = found->second;
+            const auto & tokenColor = colorNamesMap[int(token.type)];
             richText.flags = tokenColor.flags;
             richText.textColor = tokenColor.color;
             richText.textBackground = tokenColor.backgroundColor;
@@ -225,10 +244,10 @@ bool CapstoneTokenizer::IsHighlightableToken(const SingleToken & token)
 
 bool CapstoneTokenizer::tokenTextPoolEquals(const QString & a, const QString & b)
 {
-    if(a == b)
+    if(a.compare(b, Qt::CaseInsensitive) == 0)
         return true;
-    auto found1 = stringPoolMap.find(a);
-    auto found2 = stringPoolMap.find(b);
+    auto found1 = stringPoolMap.find(a.toLower());
+    auto found2 = stringPoolMap.find(b.toLower());
     if(found1 == stringPoolMap.end() || found2 == stringPoolMap.end())
         return false;
     return found1.value() == found2.value();
@@ -262,7 +281,7 @@ void CapstoneTokenizer::addToken(TokenType type, QString text, const TokenValue 
     }
     if(_bUppercase && !value.size)
         text = text.toUpper();
-    _inst.tokens.push_back(SingleToken(_cp.IsNop() ? TokenType::MnemonicNop : type, text, value));
+    _inst.tokens.push_back(SingleToken(isNop ? TokenType::MnemonicNop : type, text, value));
 }
 
 void CapstoneTokenizer::addToken(TokenType type, const QString & text)
@@ -340,11 +359,15 @@ bool CapstoneTokenizer::tokenizePrefix()
 
 bool CapstoneTokenizer::tokenizeMnemonic()
 {
+    QString mnemonic = QString(_cp.Mnemonic().c_str());
+    if(isNop)
+    {
+        tokenizeMnemonic(TokenType::MnemonicNop, mnemonic);
+        return true;
+    }
     auto type = TokenType::MnemonicNormal;
     auto id = _cp.GetId();
-    if(_cp.IsNop())
-        type = TokenType::MnemonicNop;
-    else if(_cp.InGroup(CS_GRP_CALL))
+    if(_cp.InGroup(CS_GRP_CALL))
         type = TokenType::MnemonicCall;
     else if(_cp.InGroup(CS_GRP_RET))
         type = TokenType::MnemonicRet;
@@ -387,7 +410,6 @@ bool CapstoneTokenizer::tokenizeMnemonic()
             break;
         }
     }
-    QString mnemonic = QString(_cp.Mnemonic().c_str());
 
     tokenizeMnemonic(type, mnemonic);
 

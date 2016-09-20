@@ -4,7 +4,8 @@
 #include <QDialog>
 #include <functional>
 #include "Bridge.h"
-#include "ValidateExpressionThread.h"
+
+class ValidateExpressionThread;
 
 namespace Ui
 {
@@ -42,6 +43,7 @@ private slots:
     void on_checkBoxFillWithNops_clicked(bool checked);
     void on_radioXEDParse_clicked();
     void on_radioKeystone_clicked();
+    void on_radioAsmjit_clicked();
 
 private:
     Ui::AssembleDialog* ui;
