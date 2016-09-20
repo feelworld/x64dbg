@@ -6,7 +6,7 @@
 //typedefs
 
 struct COMMAND;
-//things
+//things  things2 
 enum CMDRESULT
 {
     STATUS_ERROR = false,
